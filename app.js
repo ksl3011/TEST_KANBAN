@@ -184,9 +184,11 @@ function showLoginScreen() {
 }
 
 async function initBoard(user) {
+  console.log('[initBoard] start', user.email);
   document.getElementById('login-screen').hidden = true;
   document.getElementById('app').hidden = false;
   document.getElementById('user-email').textContent = user.email;
+  console.log('[initBoard] board visible');
 
   cards = await loadCards();
   renderAll();
@@ -208,8 +210,10 @@ AuthKanban.onAuthStateChange((event, session) => {
   if (session && !boardInitialized) {
     boardInitialized = true;
     initBoard(session.user);
-  } else if (!session && (event === 'INITIAL_SESSION' || event === 'SIGNED_OUT')) {
+  } else if (!session && event === 'SIGNED_OUT') {
     boardInitialized = false;
+    showLoginScreen();
+  } else if (!session && event === 'INITIAL_SESSION' && !boardInitialized) {
     showLoginScreen();
   }
 });
