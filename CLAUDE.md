@@ -4,8 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-Google·GitHub OAuth 로그인 + Supabase DB 기반 칸반 보드 (v2.0).  
+Google·GitHub·이메일 OAuth 로그인 + Supabase DB 기반 칸반 보드 (v2.1).  
 To-Do / In-Progress / Done 3컬럼, 카드 드래그 앤 드롭, 기기 간 카드 동기화.
+
+**배포 URL**: https://ksl3011.github.io/TEST_KANBAN
 
 ## 실행
 
