@@ -213,19 +213,29 @@ async function initBoard(user) {
 document.getElementById('btn-google').addEventListener('click', () => AuthKanban.signInWithGoogle());
 document.getElementById('btn-github').addEventListener('click', () => AuthKanban.signInWithGitHub());
 
-document.getElementById('btn-email-login').addEventListener('click', () => {
+document.getElementById('btn-email-login').addEventListener('click', async () => {
   const email = document.getElementById('input-email').value.trim();
   const password = document.getElementById('input-password').value;
   if (!email || !password) { alert('이메일과 비밀번호를 입력하세요.'); return; }
-  AuthKanban.signInWithEmail(email, password);
+  const btn = document.getElementById('btn-email-login');
+  btn.disabled = true;
+  btn.textContent = '로그인 중…';
+  await AuthKanban.signInWithEmail(email, password);
+  btn.disabled = false;
+  btn.textContent = '로그인';
 });
 
-document.getElementById('btn-email-signup').addEventListener('click', () => {
+document.getElementById('btn-email-signup').addEventListener('click', async () => {
   const email = document.getElementById('input-email').value.trim();
   const password = document.getElementById('input-password').value;
   if (!email || !password) { alert('이메일과 비밀번호를 입력하세요.'); return; }
   if (password.length < 6) { alert('비밀번호는 6자 이상이어야 합니다.'); return; }
-  AuthKanban.signUpWithEmail(email, password);
+  const btn = document.getElementById('btn-email-signup');
+  btn.disabled = true;
+  btn.textContent = '처리 중…';
+  await AuthKanban.signUpWithEmail(email, password);
+  btn.disabled = false;
+  btn.textContent = '회원가입';
 });
 
 document.getElementById('input-password').addEventListener('keydown', e => {

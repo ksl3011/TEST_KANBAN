@@ -27,8 +27,6 @@
 
 - [x] 상태 모델 (`cards` 배열)
 - [x] `uid()` — 고유 ID 생성
-- [x] `loadFromStorage()` — localStorage 로드 · 샘플 폴백
-- [x] `save()` — localStorage 저장
 - [x] `addCard()` — 카드 추가
 - [x] `deleteCard()` — 카드 삭제
 - [x] `moveCard()` — 컬럼 간 이동
@@ -38,8 +36,6 @@
 - [x] `initDropZones()` — 드롭존 이벤트 등록
 - [x] `initAddButtons()` — 추가 버튼 이벤트 등록
 - [x] `showForm()` — 인라인 입력 폼 (Enter · Esc)
-- [x] **버그 수정**: `showForm()` 빈 텍스트 확인 시 폼이 닫히던 문제 → 포커스 유지로 수정
-- [x] **버그 수정**: `cancel` 핸들러의 불필요한 `renderAll()` 제거
 
 ## Phase 5: 문서화
 
@@ -61,9 +57,63 @@
 - [x] 카드 삭제 (×) 동작 확인
 - [x] 드래그 앤 드롭 컬럼 간 이동 확인
 - [x] 드롭존 시각 피드백 확인
-- [x] 새로고침 후 localStorage 복원 확인
-- [x] 빈 텍스트 카드 추가 방지 확인 (버그 수정 후 코드 검토 완료)
-- [ ] 브라우저 실환경 통합 테스트 (수동)
+- [x] 빈 텍스트 카드 추가 방지 확인
+
+## Phase 8: OAuth + Supabase 연동 (v2.0)
+
+### 설계·문서화
+- [x] 아키텍처 결정 (Supabase Auth + DB)
+- [x] `PRD.md` v2.0 갱신 (F-06~F-09 인증 기능 추가)
+- [x] `TRD.md` v2.0 갱신 (Supabase 스택, config.js·auth.js 명세)
+- [x] `DatabaseDesign.md` 갱신 (ERD auth.users 추가, SQL DDL)
+- [x] `UserFlow.md` 갱신 (OAuth 인증 흐름 다이어그램 추가)
+- [x] `OAUTH.md` 신규 생성 (설정 단계별 가이드)
+
+### 구현
+- [x] `config.js` — Supabase 클라이언트 초기화 (implicit flow)
+- [x] `auth.js` — signInWithGoogle/GitHub, signOut, onAuthStateChange
+- [x] `index.html` — Supabase CDN, 로그인 화면 UI, 헤더 사용자정보·로그아웃 버튼
+- [x] `style.css` — 로그인 화면·로그아웃 버튼·헤더 user-info 스타일
+- [x] `app.js` — auth 게이트(boardInitialized 플래그), Supabase CRUD (async), localStorage 완전 제거
+
+### 버그 수정
+- [x] `style.css` — `[hidden] { display: none !important }` 추가 (CSS specificity 문제)
+- [x] `app.js` — 화면 전환을 `style.display` 직접 제어로 변경 (hidden 속성 미사용)
+- [x] `app.js` — `addCard`에 `user_id: currentUser.id` 포함 (RLS 정책 통과)
+- [x] `app.js` — `currentUser` 전역 변수로 로그인 사용자 보관
+
+### 검증
+- [x] 페이지 로드 시 로그인 화면 표시 확인
+- [x] Google OAuth 로그인 → 보드 표시 확인
+- [x] 로그아웃 → 로그인 화면 복귀 확인
+- [x] 카드 CRUD가 Supabase에 저장됨 (새로고침 후 유지)
+- [ ] GitHub OAuth 로그인 → 보드 표시 확인
+- [ ] 다른 브라우저/기기에서 같은 계정 로그인 시 카드 동기화
+- [ ] 미인증 상태에서 보드 직접 접근 차단 확인
+
+## Phase 9: 이메일 인증 추가 (v2.1)
+
+### 구현
+- [x] `auth.js` — `signInWithEmail`, `signUpWithEmail` 추가
+- [x] `index.html` — 이메일·비밀번호 입력 폼 + 구분선 추가
+- [x] `style.css` — 이메일 입력·버튼·구분선 스타일
+- [x] `app.js` — 로그인/회원가입/Enter 키 이벤트 리스너 등록
+- [x] `app.js` — 버튼 disabled 처리로 중복 클릭 방지 (로딩 텍스트 표시)
+- [x] `auth.js` — 중복 이메일 에러 메시지 한국어 안내
+
+### 문서 갱신
+- [x] `PRD.md` v2.1 갱신 (F-10, F-11 이메일 인증 기능 추가, Out of Scope 갱신)
+- [x] `TRD.md` v2.1 갱신 (auth.js 함수 목록, 이메일 인증 흐름, currentUser 변수)
+- [x] `UserFlow.md` v2.1 갱신 (이메일 인증 흐름 다이어그램, localStorage → Supabase)
+- [x] `OAUTH.md` v2.1 갱신 (이메일 Provider 설정 가이드 추가)
+- [x] `TASKS.md` Phase 9 추가
+
+### 검증 (예정)
+- [ ] 이메일 회원가입 → 인증 이메일 수신 확인
+- [ ] 이메일 링크 클릭 → 인증 완료 확인
+- [ ] 이메일 로그인 → 보드 표시 확인
+- [ ] 중복 이메일 회원가입 → 안내 메시지 확인
+- [ ] 버튼 클릭 중 disabled 처리 확인
 
 ## Phase 7: 향후 과제 (Backlog)
 
@@ -75,34 +125,4 @@
 - [ ] 모바일 터치 드래그 지원
 - [ ] 키보드 전용 카드 이동 (접근성)
 - [ ] 실시간 협업 (Supabase Realtime)
-
-## Phase 8: OAuth + Supabase 연동 (v2.0)
-
-### 설계·문서화
-- [x] 아키텍처 결정 (Supabase Auth + DB)
-- [x] `PRD.md` v2.0 갱신 (F-06~F-09 인증 기능 추가)
-- [x] `TRD.md` v2.0 갱신 (Supabase 스택, config.js·auth.js 명세)
-- [x] `DatabaseDesign.md` 갱신 (ERD auth.users 추가, SQL DDL)
-- [x] `UserFlow.md` 갱신 (OAuth 인증 흐름 다이어그램 추가)
-- [x] `TASKS.md` Phase 8 추가
-- [x] `CLAUDE.md` 갱신 (Supabase 아키텍처 반영)
-- [x] `OAUTH.md` 신규 생성 (설정 단계별 가이드)
-
-### 구현
-- [x] `config.js` 생성 (Supabase 클라이언트 초기화 템플릿)
-- [ ] `OAUTH.md` 가이드에 따라 실제 Supabase URL·anon key 입력
-- [ ] `OAUTH.md` 가이드에 따라 Google·GitHub OAuth 앱 등록
-- [ ] Supabase Dashboard에서 `cards` 테이블 생성·RLS 정책 설정
-- [x] `auth.js` — Auth 서비스 IIFE 구현 (signInWithGoogle/GitHub, signOut, onAuthStateChange)
-- [x] `index.html` — Supabase CDN, 로그인 화면 UI, 헤더 사용자정보·로그아웃 버튼 추가
-- [x] `style.css` — 로그인 화면·로그아웃 버튼·헤더 user-info 스타일 추가
-- [x] `app.js` — auth 게이트(boardInitialized 플래그), Supabase CRUD (async), localStorage 완전 제거
-
-### 검증 (예정)
-- [ ] 페이지 로드 시 로그인 화면 표시 확인
-- [ ] Google OAuth 로그인 → 보드 표시 확인
-- [ ] GitHub OAuth 로그인 → 보드 표시 확인
-- [ ] 로그아웃 → 로그인 화면 복귀 확인
-- [ ] 카드 CRUD가 Supabase에 저장됨 (새로고침 후 유지)
-- [ ] 다른 브라우저/기기에서 같은 계정 로그인 시 카드 동기화
-- [ ] 미인증 상태에서 보드 직접 접근 차단 확인
+- [ ] 비밀번호 재설정 (Forgot Password)
