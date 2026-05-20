@@ -115,6 +115,125 @@
 - [ ] 중복 이메일 회원가입 → 안내 메시지 확인
 - [ ] 버튼 클릭 중 disabled 처리 확인
 
+## Phase 10: v3.0 — 카드 메타데이터·활동로그·실시간·팀공유 (2026-05-20)
+
+### Supabase DDL (SQL Editor에서 실행 필수)
+
+```sql
+-- Phase A: 카드 메타데이터
+ALTER TABLE public.cards
+  ADD COLUMN IF NOT EXISTS due_date  DATE,
+  ADD COLUMN IF NOT EXISTS priority  TEXT DEFAULT 'medium'
+    CHECK(priority IN ('low','medium','high')),
+  ADD COLUMN IF NOT EXISTS tags      JSONB DEFAULT '[]';
+
+-- Phase C: 활동 로그
+CREATE TABLE IF NOT EXISTS public.activity_logs (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  card_id    TEXT REFERENCES public.cards(id) ON DELETE SET NULL,
+  action     TEXT NOT NULL,
+  detail     JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "own logs" ON public.activity_logs
+  USING  (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- Phase D: 팀 공유
+CREATE TABLE IF NOT EXISTS public.boards (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  owner_id   UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.boards ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "board access" ON public.boards
+  USING (
+    auth.uid() = owner_id OR
+    auth.uid() IN (SELECT user_id FROM public.board_members WHERE board_id = boards.id)
+  );
+
+CREATE TABLE IF NOT EXISTS public.board_members (
+  board_id   TEXT NOT NULL REFERENCES public.boards(id) ON DELETE CASCADE,
+  user_id    UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role       TEXT DEFAULT 'member' CHECK(role IN ('owner','member')),
+  joined_at  TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (board_id, user_id)
+);
+ALTER TABLE public.board_members ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "member access" ON public.board_members
+  USING (
+    auth.uid() = user_id OR
+    auth.uid() IN (SELECT owner_id FROM public.boards WHERE id = board_id)
+  );
+CREATE POLICY "join board" ON public.board_members FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+ALTER TABLE public.cards ADD COLUMN IF NOT EXISTS board_id TEXT
+  REFERENCES public.boards(id) ON DELETE CASCADE;
+
+DROP POLICY IF EXISTS "own cards" ON public.cards;
+CREATE POLICY "cards select" ON public.cards FOR SELECT
+  USING (
+    (board_id IS NULL AND auth.uid() = user_id) OR
+    board_id IN (
+      SELECT id FROM public.boards WHERE owner_id = auth.uid()
+      UNION SELECT board_id FROM public.board_members WHERE user_id = auth.uid()
+    )
+  );
+CREATE POLICY "cards insert" ON public.cards FOR INSERT
+  WITH CHECK (
+    auth.uid() = user_id AND (
+      board_id IS NULL OR
+      board_id IN (
+        SELECT id FROM public.boards WHERE owner_id = auth.uid()
+        UNION SELECT board_id FROM public.board_members WHERE user_id = auth.uid()
+      )
+    )
+  );
+CREATE POLICY "cards update" ON public.cards FOR UPDATE
+  USING (
+    auth.uid() = user_id OR
+    board_id IN (
+      SELECT id FROM public.boards WHERE owner_id = auth.uid()
+      UNION SELECT board_id FROM public.board_members WHERE user_id = auth.uid()
+    )
+  );
+CREATE POLICY "cards delete" ON public.cards FOR DELETE
+  USING (
+    auth.uid() = user_id OR
+    board_id IN (
+      SELECT id FROM public.boards WHERE owner_id = auth.uid()
+      UNION SELECT board_id FROM public.board_members WHERE user_id = auth.uid()
+    )
+  );
+```
+
+### 구현
+- [x] `app.js` — 카드 메타데이터 (priority, due_date, tags) CRUD
+- [x] `app.js` — `updateCard()` 신규 함수
+- [x] `app.js` — `logActivity()`, `loadActivityLogs()`, `renderActivityLog()`
+- [x] `app.js` — `subscribeRealtime()` — Supabase Realtime 구독
+- [x] `app.js` — 보드 관리: `loadBoards()`, `createBoard()`, `joinBoard()`, `switchBoard()`
+- [x] `app.js` — 카드 편집 모달, 보드 설정 모달 이벤트
+- [x] `index.html` — 카드 편집 모달 (`#card-modal`)
+- [x] `index.html` — 활동 로그 패널 (`#activity-panel`)
+- [x] `index.html` — 보드 설정 모달 (`#board-modal`)
+- [x] `index.html` — 헤더: 보드 정보 + 활동 로그 토글 버튼
+- [x] `style.css` — priority 뱃지, 태그, 마감일 스타일
+- [x] `style.css` — 모달, 활동 로그 패널, 보드 모달 스타일
+
+### 검증 (예정 — Supabase DDL 실행 후)
+- [ ] 카드 추가 → priority 뱃지 표시
+- [ ] 카드 텍스트 클릭 → 편집 모달 → 우선순위/마감일/태그 수정 → 저장
+- [ ] 두 브라우저 탭 → 한 쪽 카드 추가 → 다른 탭 자동 반영
+- [ ] 활동 로그 버튼 → 로그 패널 표시
+- [ ] 보드 설정 → 새 보드 생성 → 전환
+- [ ] 보드 ID 복사 → 다른 계정에서 참여
+- [ ] 팀 공유 보드에서 카드 추가 → 다른 멤버 화면에 Realtime 반영
+
 ## Phase 7: 향후 과제 (Backlog)
 
 - [ ] 카드 내용 인라인 편집

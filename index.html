@@ -37,41 +37,124 @@
   <!-- 앱 (인증 후 표시) -->
   <div id="app" style="display:none">
     <header class="app-header">
-      <h1>칸반 보드</h1>
+      <div class="header-left">
+        <h1>칸반 보드</h1>
+        <div id="board-info">
+          <span id="board-name">개인 보드</span>
+          <button class="header-btn" id="btn-board-settings">⚙ 보드 설정</button>
+        </div>
+      </div>
       <div class="user-info">
+        <button class="header-btn" id="btn-activity">활동 로그</button>
         <span id="user-email"></span>
         <button class="logout-btn" id="btn-logout">로그아웃</button>
       </div>
     </header>
 
-    <main class="board">
-      <section class="column" id="col-todo">
-        <div class="column-header" style="--accent: var(--col-todo)">
-          <span class="column-title">To-Do</span>
-          <span class="column-count" data-column="todo"></span>
-        </div>
-        <div class="cards" data-column="todo"></div>
-        <button class="add-btn" data-column="todo">+ 카드 추가</button>
+    <div class="app-body">
+      <main class="board">
+        <section class="column" id="col-todo">
+          <div class="column-header" style="--accent: var(--col-todo)">
+            <span class="column-title">To-Do</span>
+            <span class="column-count" data-column="todo"></span>
+          </div>
+          <div class="cards" data-column="todo"></div>
+          <button class="add-btn" data-column="todo">+ 카드 추가</button>
+        </section>
+
+        <section class="column" id="col-inprogress">
+          <div class="column-header" style="--accent: var(--col-progress)">
+            <span class="column-title">In-Progress</span>
+            <span class="column-count" data-column="inprogress"></span>
+          </div>
+          <div class="cards" data-column="inprogress"></div>
+          <button class="add-btn" data-column="inprogress">+ 카드 추가</button>
+        </section>
+
+        <section class="column" id="col-done">
+          <div class="column-header" style="--accent: var(--col-done)">
+            <span class="column-title">Done</span>
+            <span class="column-count" data-column="done"></span>
+          </div>
+          <div class="cards" data-column="done"></div>
+          <button class="add-btn" data-column="done">+ 카드 추가</button>
+        </section>
+      </main>
+
+      <!-- 활동 로그 패널 (기본 숨김) -->
+      <aside id="activity-panel" style="display:none">
+        <h3 class="panel-title">활동 로그</h3>
+        <ul id="activity-log-list"></ul>
+      </aside>
+    </div>
+  </div>
+
+  <!-- 카드 편집 모달 -->
+  <div id="card-modal" style="display:none">
+    <div class="modal-overlay" id="modal-overlay"></div>
+    <div class="modal-box">
+      <h3 class="modal-title">카드 편집</h3>
+      <label class="modal-label">내용
+        <textarea id="modal-text" rows="4"></textarea>
+      </label>
+      <label class="modal-label">우선순위
+        <select id="modal-priority" class="modal-select">
+          <option value="low">낮음</option>
+          <option value="medium">보통</option>
+          <option value="high">높음</option>
+        </select>
+      </label>
+      <label class="modal-label">마감일
+        <input type="date" id="modal-due" class="modal-input" />
+      </label>
+      <label class="modal-label">태그 <span class="modal-hint">(쉼표로 구분)</span>
+        <input type="text" id="modal-tags" class="modal-input" placeholder="예: 기획, 디자인" />
+      </label>
+      <div class="modal-actions">
+        <button class="btn-confirm" id="modal-save">저장</button>
+        <button class="btn-cancel" id="modal-cancel">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 보드 설정 모달 -->
+  <div id="board-modal" style="display:none">
+    <div class="modal-overlay" id="board-modal-overlay"></div>
+    <div class="modal-box modal-box--wide">
+      <div class="modal-header">
+        <h3 class="modal-title">보드 설정</h3>
+        <button class="modal-close" id="btn-board-modal-close">✕</button>
+      </div>
+
+      <section class="board-modal-section">
+        <h4 class="board-modal-section-title">보드 목록</h4>
+        <ul id="board-list" class="board-list"></ul>
       </section>
 
-      <section class="column" id="col-inprogress">
-        <div class="column-header" style="--accent: var(--col-progress)">
-          <span class="column-title">In-Progress</span>
-          <span class="column-count" data-column="inprogress"></span>
+      <section class="board-modal-section">
+        <h4 class="board-modal-section-title">새 보드 만들기</h4>
+        <div class="board-modal-row">
+          <input type="text" id="input-board-name" class="modal-input" placeholder="보드 이름" />
+          <button class="btn-confirm btn-sm" id="btn-board-create">만들기</button>
         </div>
-        <div class="cards" data-column="inprogress"></div>
-        <button class="add-btn" data-column="inprogress">+ 카드 추가</button>
       </section>
 
-      <section class="column" id="col-done">
-        <div class="column-header" style="--accent: var(--col-done)">
-          <span class="column-title">Done</span>
-          <span class="column-count" data-column="done"></span>
+      <section class="board-modal-section">
+        <h4 class="board-modal-section-title">보드 참여 (ID 입력)</h4>
+        <div class="board-modal-row">
+          <input type="text" id="input-join-board-id" class="modal-input" placeholder="보드 ID" />
+          <button class="btn-confirm btn-sm" id="btn-board-join">참여</button>
         </div>
-        <div class="cards" data-column="done"></div>
-        <button class="add-btn" data-column="done">+ 카드 추가</button>
       </section>
-    </main>
+
+      <section class="board-modal-section" id="board-share-row" style="display:none">
+        <h4 class="board-modal-section-title">현재 보드 ID 공유</h4>
+        <div class="board-modal-row">
+          <code id="board-share-id" class="board-share-id"></code>
+          <button class="btn-cancel btn-sm" id="btn-board-share-copy">복사</button>
+        </div>
+      </section>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>

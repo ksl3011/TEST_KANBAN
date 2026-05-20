@@ -2,6 +2,8 @@ let cards = [];
 let dragId = null;
 let boardInitialized = false;
 let currentUser = null;
+let currentBoard = null;
+let realtimeChannel = null;
 
 // ── 유틸 ─────────────────────────────────────────────
 
@@ -17,38 +19,64 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+function priorityLabel(p) {
+  return { low: '낮음', medium: '보통', high: '높음' }[p] ?? '보통';
+}
+
+function actionLabel(a) {
+  return { add: '카드 추가', delete: '카드 삭제', move: '카드 이동', update: '카드 수정' }[a] ?? a;
+}
+
+function relativeTime(ts) {
+  const diff = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return '방금 전';
+  if (m < 60) return m + '분 전';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + '시간 전';
+  return Math.floor(h / 24) + '일 전';
+}
+
 // ── Supabase CRUD ────────────────────────────────────
 
 async function loadCards() {
-  console.log('[loadCards] start');
-  const { data, error } = await supabaseClient
+  let query = supabaseClient
     .from('cards')
-    .select('id, text, column')
+    .select('id, text, column, due_date, priority, tags, board_id')
     .order('created_at');
-  if (error) {
-    console.error('[loadCards] error', error.code, error.message);
-    alert('카드 로드 실패: ' + error.message);
-    return [];
+  if (currentBoard) {
+    query = query.eq('board_id', currentBoard.id);
+  } else {
+    query = query.is('board_id', null);
   }
-  console.log('[loadCards] success', data.length, 'cards');
+  const { data, error } = await query;
+  if (error) { alert('카드 로드 실패: ' + error.message); return []; }
   return data;
 }
 
 async function addCard(column, text) {
   const trimmed = text.trim();
   if (!trimmed) return;
-  const card = { id: uid(), text: trimmed, column, user_id: currentUser.id };
+  const card = {
+    id: uid(), text: trimmed, column,
+    user_id: currentUser.id,
+    priority: 'medium', tags: [],
+    board_id: currentBoard ? currentBoard.id : null,
+  };
   const { error } = await supabaseClient.from('cards').insert(card);
   if (error) { alert('카드 추가 실패: ' + error.message); return; }
   cards.push(card);
   renderAll();
+  logActivity('add', card.id, { text: trimmed, column });
 }
 
 async function deleteCard(id) {
+  const card = cards.find(c => c.id === id);
   const { error } = await supabaseClient.from('cards').delete().eq('id', id);
   if (error) { alert('카드 삭제 실패: ' + error.message); return; }
   cards = cards.filter(c => c.id !== id);
   renderAll();
+  if (card) logActivity('delete', id, { text: card.text, column: card.column });
 }
 
 async function moveCard(id, targetColumn) {
@@ -59,8 +87,122 @@ async function moveCard(id, targetColumn) {
     .update({ column: targetColumn })
     .eq('id', id);
   if (error) { alert('카드 이동 실패: ' + error.message); return; }
+  const fromColumn = card.column;
   card.column = targetColumn;
   renderAll();
+  logActivity('move', id, { from: fromColumn, to: targetColumn });
+}
+
+async function updateCard(id, updates) {
+  const { error } = await supabaseClient.from('cards').update(updates).eq('id', id);
+  if (error) { alert('카드 수정 실패: ' + error.message); return; }
+  const card = cards.find(c => c.id === id);
+  Object.assign(card, updates);
+  renderAll();
+  logActivity('update', id, updates);
+}
+
+// ── 활동 로그 ────────────────────────────────────────
+
+async function logActivity(action, cardId, detail) {
+  await supabaseClient.from('activity_logs').insert({
+    user_id: currentUser.id, card_id: cardId, action, detail,
+  }).catch(() => {});
+}
+
+async function loadActivityLogs() {
+  const { data } = await supabaseClient
+    .from('activity_logs')
+    .select('id, action, detail, created_at, card_id')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  return data ?? [];
+}
+
+function renderActivityLog(logs) {
+  const el = document.getElementById('activity-log-list');
+  if (!el) return;
+  if (!logs.length) {
+    el.innerHTML = '<li class="log-empty">활동 없음</li>';
+    return;
+  }
+  el.innerHTML = logs.map(l => `
+    <li class="log-item">
+      <span class="log-action">${actionLabel(l.action)}</span>
+      <span class="log-time">${relativeTime(l.created_at)}</span>
+    </li>
+  `).join('');
+}
+
+// ── 보드 관리 ────────────────────────────────────────
+
+async function loadBoards() {
+  const { data } = await supabaseClient
+    .from('boards')
+    .select('id, name, owner_id')
+    .order('created_at');
+  return data ?? [];
+}
+
+async function createBoard(name) {
+  const id = uid();
+  const { error } = await supabaseClient.from('boards').insert({
+    id, name, owner_id: currentUser.id,
+  });
+  if (error) { alert('보드 생성 실패: ' + error.message); return null; }
+  await supabaseClient.from('board_members').insert({
+    board_id: id, user_id: currentUser.id, role: 'owner',
+  });
+  return { id, name, owner_id: currentUser.id };
+}
+
+async function joinBoard(boardId) {
+  const { error } = await supabaseClient.from('board_members').insert({
+    board_id: boardId, user_id: currentUser.id, role: 'member',
+  });
+  if (error) {
+    if (error.code === '23505') { alert('이미 참여 중인 보드입니다.'); }
+    else { alert('보드 참여 실패: ' + error.message); }
+    return false;
+  }
+  return true;
+}
+
+async function switchBoard(board) {
+  currentBoard = board;
+  document.getElementById('board-name').textContent = board ? board.name : '개인 보드';
+  cards = await loadCards();
+  renderAll();
+  if (realtimeChannel) {
+    supabaseClient.removeChannel(realtimeChannel);
+  }
+  realtimeChannel = subscribeRealtime();
+}
+
+// ── 실시간 동기화 ─────────────────────────────────────
+
+function subscribeRealtime() {
+  const channelId = 'cards-' + (currentBoard ? currentBoard.id : 'personal-' + currentUser.id);
+  const channel = supabaseClient
+    .channel(channelId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cards' }, payload => {
+      if (cards.find(c => c.id === payload.new.id)) return;
+      const relevant = currentBoard
+        ? payload.new.board_id === currentBoard.id
+        : !payload.new.board_id && payload.new.user_id === currentUser.id;
+      if (relevant) { cards.push(payload.new); renderAll(); }
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cards' }, payload => {
+      const idx = cards.findIndex(c => c.id === payload.new.id);
+      if (idx !== -1) { cards[idx] = payload.new; renderAll(); }
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cards' }, payload => {
+      const before = cards.length;
+      cards = cards.filter(c => c.id !== payload.old.id);
+      if (cards.length !== before) renderAll();
+    })
+    .subscribe();
+  return channel;
 }
 
 // ── 렌더링 ──────────────────────────────────────────
@@ -82,14 +224,33 @@ function buildCard(card) {
   el.draggable = true;
   el.dataset.id = card.id;
 
+  const priority = card.priority ?? 'medium';
+  const tags = Array.isArray(card.tags) ? card.tags : [];
+  const dueDateHtml = card.due_date
+    ? `<span class="card-due">마감: ${escapeHtml(card.due_date)}</span>`
+    : '';
+  const tagsHtml = tags.length
+    ? `<div class="card-tags">${tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>`
+    : '';
+
   el.innerHTML = `
+    <div class="card-header">
+      <span class="card-priority card-priority--${priority}">${priorityLabel(priority)}</span>
+      <button class="card-delete" title="삭제">✕</button>
+    </div>
     <span class="card-text">${escapeHtml(card.text)}</span>
-    <button class="card-delete" title="삭제">✕</button>
+    ${dueDateHtml}
+    ${tagsHtml}
   `;
 
   el.querySelector('.card-delete').addEventListener('click', e => {
     e.stopPropagation();
     deleteCard(card.id);
+  });
+
+  el.querySelector('.card-text').addEventListener('click', e => {
+    e.stopPropagation();
+    openCardModal(card);
   });
 
   el.addEventListener('dragstart', e => {
@@ -105,6 +266,64 @@ function buildCard(card) {
   });
 
   return el;
+}
+
+// ── 카드 편집 모달 ────────────────────────────────────
+
+let modalCardId = null;
+
+function openCardModal(card) {
+  modalCardId = card.id;
+  document.getElementById('modal-text').value = card.text;
+  document.getElementById('modal-priority').value = card.priority ?? 'medium';
+  document.getElementById('modal-due').value = card.due_date ?? '';
+  document.getElementById('modal-tags').value = (Array.isArray(card.tags) ? card.tags : []).join(', ');
+  document.getElementById('card-modal').style.display = '';
+}
+
+function closeCardModal() {
+  document.getElementById('card-modal').style.display = 'none';
+  modalCardId = null;
+}
+
+// ── 보드 설정 모달 ────────────────────────────────────
+
+async function openBoardModal() {
+  const boards = await loadBoards();
+  renderBoardModal(boards);
+  document.getElementById('board-modal').style.display = '';
+}
+
+function closeBoardModal() {
+  document.getElementById('board-modal').style.display = 'none';
+}
+
+async function renderBoardModal(boards) {
+  const listEl = document.getElementById('board-list');
+  const personalItem = `<li class="board-list-item${currentBoard === null ? ' active' : ''}" data-board-id="">개인 보드${currentBoard === null ? ' <span class="board-current">현재</span>' : ''}</li>`;
+  const boardItems = boards.map(b => `
+    <li class="board-list-item${currentBoard && currentBoard.id === b.id ? ' active' : ''}" data-board-id="${b.id}">
+      ${escapeHtml(b.name)}${currentBoard && currentBoard.id === b.id ? ' <span class="board-current">현재</span>' : ''}
+    </li>
+  `).join('');
+  listEl.innerHTML = personalItem + boardItems;
+  listEl.querySelectorAll('.board-list-item').forEach(item => {
+    item.addEventListener('click', async () => {
+      const bId = item.dataset.boardId;
+      if (!bId) {
+        await switchBoard(null);
+      } else {
+        const board = boards.find(b => b.id === bId);
+        if (board) await switchBoard(board);
+      }
+      closeBoardModal();
+    });
+  });
+
+  // 현재 보드 ID 표시 (공유용)
+  const shareEl = document.getElementById('board-share-id');
+  shareEl.textContent = currentBoard ? currentBoard.id : '';
+  document.getElementById('board-share-row').style.display = currentBoard ? '' : 'none';
 }
 
 // ── 드롭존 이벤트 ────────────────────────────────────
@@ -196,6 +415,7 @@ async function initBoard(user) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = '';
   document.getElementById('user-email').textContent = user.email;
+  document.getElementById('board-name').textContent = '개인 보드';
   console.log('[initBoard] board visible');
 
   cards = await loadCards();
@@ -203,9 +423,10 @@ async function initBoard(user) {
   initDropZones();
   initAddButtons();
 
-  document.getElementById('btn-logout').addEventListener('click', () => {
-    AuthKanban.signOut();
-  });
+  loadActivityLogs().then(renderActivityLog);
+  realtimeChannel = subscribeRealtime();
+
+  document.getElementById('btn-logout').addEventListener('click', () => AuthKanban.signOut());
 }
 
 // ── 초기화 ────────────────────────────────────────────
@@ -240,6 +461,78 @@ document.getElementById('btn-email-signup').addEventListener('click', async () =
 
 document.getElementById('input-password').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-email-login').click();
+});
+
+// 카드 편집 모달
+document.getElementById('modal-save').addEventListener('click', async () => {
+  if (!modalCardId) return;
+  const text = document.getElementById('modal-text').value.trim();
+  if (!text) { alert('내용을 입력하세요.'); return; }
+  const priority = document.getElementById('modal-priority').value;
+  const due_date = document.getElementById('modal-due').value || null;
+  const tagsRaw = document.getElementById('modal-tags').value;
+  const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+  await updateCard(modalCardId, { text, priority, due_date, tags });
+  closeCardModal();
+});
+document.getElementById('modal-cancel').addEventListener('click', closeCardModal);
+document.getElementById('modal-overlay').addEventListener('click', closeCardModal);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('card-modal').style.display !== 'none') closeCardModal();
+    if (document.getElementById('board-modal').style.display !== 'none') closeBoardModal();
+  }
+});
+
+// 활동 로그 토글
+document.getElementById('btn-activity').addEventListener('click', () => {
+  const panel = document.getElementById('activity-panel');
+  const isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? '' : 'none';
+  if (isHidden) loadActivityLogs().then(renderActivityLog);
+});
+
+// 보드 설정 모달
+document.getElementById('btn-board-settings').addEventListener('click', openBoardModal);
+document.getElementById('btn-board-modal-close').addEventListener('click', closeBoardModal);
+document.getElementById('board-modal-overlay').addEventListener('click', closeBoardModal);
+
+document.getElementById('btn-board-create').addEventListener('click', async () => {
+  const name = document.getElementById('input-board-name').value.trim();
+  if (!name) { alert('보드 이름을 입력하세요.'); return; }
+  const btn = document.getElementById('btn-board-create');
+  btn.disabled = true;
+  const board = await createBoard(name);
+  btn.disabled = false;
+  if (board) {
+    document.getElementById('input-board-name').value = '';
+    await switchBoard(board);
+    closeBoardModal();
+  }
+});
+
+document.getElementById('btn-board-join').addEventListener('click', async () => {
+  const boardId = document.getElementById('input-join-board-id').value.trim();
+  if (!boardId) { alert('보드 ID를 입력하세요.'); return; }
+  const btn = document.getElementById('btn-board-join');
+  btn.disabled = true;
+  const ok = await joinBoard(boardId);
+  btn.disabled = false;
+  if (ok) {
+    document.getElementById('input-join-board-id').value = '';
+    // 참여한 보드로 전환
+    const boards = await loadBoards();
+    const board = boards.find(b => b.id === boardId);
+    if (board) {
+      await switchBoard(board);
+      closeBoardModal();
+    }
+  }
+});
+
+document.getElementById('btn-board-share-copy').addEventListener('click', () => {
+  const id = document.getElementById('board-share-id').textContent;
+  navigator.clipboard.writeText(id).then(() => alert('보드 ID가 복사되었습니다.\n팀원에게 공유하세요.'));
 });
 
 AuthKanban.onAuthStateChange((event, session) => {
