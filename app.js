@@ -204,6 +204,7 @@ document.getElementById('btn-google').addEventListener('click', () => AuthKanban
 document.getElementById('btn-github').addEventListener('click', () => AuthKanban.signInWithGitHub());
 
 AuthKanban.onAuthStateChange((event, session) => {
+  console.log('[Auth]', event, session?.user?.email ?? 'no session', location.href);
   if (session && !boardInitialized) {
     boardInitialized = true;
     initBoard(session.user);
