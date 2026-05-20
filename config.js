@@ -2,4 +2,6 @@
 const SUPABASE_URL = 'https://kurfsgitnocowwufbzgo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_vcOt6QiVakzgCh_JKQPbqQ_qPvRKDoe';
 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { flowType: 'implicit' },
+});
