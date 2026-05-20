@@ -213,6 +213,25 @@ async function initBoard(user) {
 document.getElementById('btn-google').addEventListener('click', () => AuthKanban.signInWithGoogle());
 document.getElementById('btn-github').addEventListener('click', () => AuthKanban.signInWithGitHub());
 
+document.getElementById('btn-email-login').addEventListener('click', () => {
+  const email = document.getElementById('input-email').value.trim();
+  const password = document.getElementById('input-password').value;
+  if (!email || !password) { alert('이메일과 비밀번호를 입력하세요.'); return; }
+  AuthKanban.signInWithEmail(email, password);
+});
+
+document.getElementById('btn-email-signup').addEventListener('click', () => {
+  const email = document.getElementById('input-email').value.trim();
+  const password = document.getElementById('input-password').value;
+  if (!email || !password) { alert('이메일과 비밀번호를 입력하세요.'); return; }
+  if (password.length < 6) { alert('비밀번호는 6자 이상이어야 합니다.'); return; }
+  AuthKanban.signUpWithEmail(email, password);
+});
+
+document.getElementById('input-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-email-login').click();
+});
+
 AuthKanban.onAuthStateChange((event, session) => {
   console.log('[Auth]', event, session?.user?.email ?? 'no session');
   if (session && !boardInitialized) {

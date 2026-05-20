@@ -94,6 +94,68 @@ body {
   color: #fff;
 }
 
+.login-btn--email {
+  flex: 1;
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.login-btn--signup {
+  flex: 1;
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid #c4c9d4;
+}
+
+.login-btn--signup:hover {
+  background: #f4f6fa;
+}
+
+/* ── 이메일 폼 ── */
+.email-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.email-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #c4c9d4;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.email-input:focus {
+  border-color: #6c8ebf;
+}
+
+.email-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 구분선 ── */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin: 4px 0;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e0e3ea;
+}
+
 /* ── 헤더 ── */
 .app-header {
   display: flex;

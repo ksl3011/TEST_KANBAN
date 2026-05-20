@@ -27,5 +27,18 @@ const AuthKanban = (() => {
     return supabaseClient.auth.onAuthStateChange(callback);
   }
 
-  return { signInWithGoogle, signInWithGitHub, signOut, onAuthStateChange };
+  async function signInWithEmail(email, password) {
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) alert('로그인 실패: ' + error.message);
+  }
+
+  async function signUpWithEmail(email, password) {
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) { alert('회원가입 실패: ' + error.message); return; }
+    if (data.user && !data.session) {
+      alert('인증 이메일을 발송했습니다. 메일함을 확인하고 링크를 클릭한 후 로그인해 주세요.');
+    }
+  }
+
+  return { signInWithGoogle, signInWithGitHub, signInWithEmail, signUpWithEmail, signOut, onAuthStateChange };
 })();
