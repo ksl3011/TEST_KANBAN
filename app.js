@@ -1,6 +1,7 @@
 let cards = [];
 let dragId = null;
 let boardInitialized = false;
+let currentUser = null;
 
 // ── 유틸 ─────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ async function loadCards() {
 async function addCard(column, text) {
   const trimmed = text.trim();
   if (!trimmed) return;
-  const card = { id: uid(), text: trimmed, column };
+  const card = { id: uid(), text: trimmed, column, user_id: currentUser.id };
   const { error } = await supabaseClient.from('cards').insert(card);
   if (error) { alert('카드 추가 실패: ' + error.message); return; }
   cards.push(card);
@@ -185,14 +186,15 @@ function showForm(column, addBtn) {
 // ── 인증·화면 전환 ─────────────────────────────────────
 
 function showLoginScreen() {
-  document.getElementById('login-screen').hidden = false;
-  document.getElementById('app').hidden = true;
+  document.getElementById('login-screen').style.display = '';
+  document.getElementById('app').style.display = 'none';
 }
 
 async function initBoard(user) {
   console.log('[initBoard] start', user.email);
-  document.getElementById('login-screen').hidden = true;
-  document.getElementById('app').hidden = false;
+  currentUser = user;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = '';
   document.getElementById('user-email').textContent = user.email;
   console.log('[initBoard] board visible');
 
