@@ -206,9 +206,20 @@ document.getElementById('btn-github').addEventListener('click', () => AuthKanban
 AuthKanban.onAuthStateChange((event, session) => {
   if (session && !boardInitialized) {
     boardInitialized = true;
+    // OAuth 코드 파라미터를 URL에서 제거 (히스토리 오염 방지)
+    const url = new URL(location.href);
+    if (url.searchParams.has('code')) {
+      url.searchParams.delete('code');
+      history.replaceState(null, '', url.toString());
+    }
     initBoard(session.user);
-  } else if (!session) {
+  } else if (!session && event === 'SIGNED_OUT') {
     boardInitialized = false;
     showLoginScreen();
+  } else if (!session && event === 'INITIAL_SESSION') {
+    // ?code= 가 있으면 PKCE 교환 중 — 로그인 화면 표시 보류
+    if (!new URLSearchParams(location.search).has('code')) {
+      showLoginScreen();
+    }
   }
 });
