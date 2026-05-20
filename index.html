@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>칸반 보드</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>칸반 보드</h1>
+  </header>
+
+  <main class="board">
+    <section class="column" id="col-todo">
+      <div class="column-header" style="--accent: var(--col-todo)">
+        <span class="column-title">To-Do</span>
+        <span class="column-count" data-column="todo"></span>
+      </div>
+      <div class="cards" data-column="todo"></div>
+      <button class="add-btn" data-column="todo">+ 카드 추가</button>
+    </section>
+
+    <section class="column" id="col-inprogress">
+      <div class="column-header" style="--accent: var(--col-progress)">
+        <span class="column-title">In-Progress</span>
+        <span class="column-count" data-column="inprogress"></span>
+      </div>
+      <div class="cards" data-column="inprogress"></div>
+      <button class="add-btn" data-column="inprogress">+ 카드 추가</button>
+    </section>
+
+    <section class="column" id="col-done">
+      <div class="column-header" style="--accent: var(--col-done)">
+        <span class="column-title">Done</span>
+        <span class="column-count" data-column="done"></span>
+      </div>
+      <div class="cards" data-column="done"></div>
+      <button class="add-btn" data-column="done">+ 카드 추가</button>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
