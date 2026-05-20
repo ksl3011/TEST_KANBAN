@@ -18,6 +18,8 @@
   padding: 0;
 }
 
+[hidden] { display: none !important; }
+
 body {
   font-family: 'Segoe UI', system-ui, sans-serif;
   background: var(--bg);
