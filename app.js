@@ -105,9 +105,11 @@ async function updateCard(id, updates) {
 // ── 활동 로그 ────────────────────────────────────────
 
 async function logActivity(action, cardId, detail) {
-  await supabaseClient.from('activity_logs').insert({
-    user_id: currentUser.id, card_id: cardId, action, detail,
-  }).catch(() => {});
+  try {
+    await supabaseClient.from('activity_logs').insert({
+      user_id: currentUser.id, card_id: cardId, action, detail,
+    });
+  } catch (_) {}
 }
 
 async function loadActivityLogs() {
