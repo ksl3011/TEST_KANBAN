@@ -19,11 +19,17 @@ function escapeHtml(str) {
 // ── Supabase CRUD ────────────────────────────────────
 
 async function loadCards() {
+  console.log('[loadCards] start');
   const { data, error } = await supabaseClient
     .from('cards')
     .select('id, text, column')
     .order('created_at');
-  if (error) { alert('카드 로드 실패: ' + error.message); return []; }
+  if (error) {
+    console.error('[loadCards] error', error.code, error.message);
+    alert('카드 로드 실패: ' + error.message);
+    return [];
+  }
+  console.log('[loadCards] success', data.length, 'cards');
   return data;
 }
 
@@ -206,14 +212,22 @@ document.getElementById('btn-google').addEventListener('click', () => AuthKanban
 document.getElementById('btn-github').addEventListener('click', () => AuthKanban.signInWithGitHub());
 
 AuthKanban.onAuthStateChange((event, session) => {
-  console.log('[Auth]', event, session?.user?.email ?? 'no session', location.href);
+  console.log('[Auth]', event, session?.user?.email ?? 'no session');
   if (session && !boardInitialized) {
     boardInitialized = true;
     initBoard(session.user);
   } else if (!session && event === 'SIGNED_OUT') {
+    console.log('[Auth] → showLoginScreen (SIGNED_OUT)');
     boardInitialized = false;
     showLoginScreen();
-  } else if (!session && event === 'INITIAL_SESSION' && !boardInitialized) {
-    showLoginScreen();
+  } else if (!session && event === 'INITIAL_SESSION') {
+    if (!boardInitialized) {
+      console.log('[Auth] → showLoginScreen (INITIAL_SESSION, no session)');
+      showLoginScreen();
+    } else {
+      console.log('[Auth] INITIAL_SESSION ignored (board already up)');
+    }
+  } else {
+    console.log('[Auth] event ignored (boardInitialized=' + boardInitialized + ', hasSession=' + !!session + ')');
   }
 });
