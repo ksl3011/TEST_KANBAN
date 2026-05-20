@@ -1,7 +1,7 @@
 # Database Design — 데이터베이스 설계
 
-> 현재 버전은 서버 DB 없이 **브라우저 localStorage**를 영속 저장소로 사용한다.  
-> 아래 ERD는 논리 데이터 모델이며, 향후 백엔드 DB(예: SQLite, PostgreSQL) 전환 시 그대로 적용할 수 있다.
+> v2.0부터 **Supabase Database(PostgreSQL)**를 영속 저장소로 사용한다.  
+> Supabase Auth가 `auth.users`를 자동 관리하며, `public.cards`는 `user_id`로 사용자를 격리한다.
 
 ---
 
@@ -9,90 +9,94 @@
 
 ```mermaid
 erDiagram
-    BOARD {
-        string id PK "고유 식별자 (uid)"
-        string title "보드 이름"
-        string created_at "생성 일시 (ISO 8601)"
+    AUTH_USERS {
+        uuid id PK "Supabase Auth 자동 관리"
+        string email "로그인 이메일"
+        string provider "google | github"
+        timestamptz created_at "가입 일시"
     }
 
-    COLUMN {
-        string id PK "고유 식별자"
-        string board_id FK "소속 보드"
-        string name "컬럼 이름 (todo / inprogress / done)"
-        int    position "컬럼 순서 (0-based)"
+    CARDS {
+        text id PK "uid() 생성값"
+        uuid user_id FK "소유 사용자 (auth.users.id)"
+        text text "카드 본문 (1~2000자)"
+        text column "todo | inprogress | done"
+        timestamptz created_at "생성 일시"
     }
 
-    CARD {
-        string id PK "고유 식별자 (uid)"
-        string column_id FK "소속 컬럼"
-        string text "카드 본문 (1~2000자)"
-        int    position "컬럼 내 순서 (0-based)"
-        string created_at "생성 일시 (ISO 8601)"
-        string updated_at "마지막 수정 일시"
-    }
-
-    BOARD ||--o{ COLUMN : "has"
-    COLUMN ||--o{ CARD   : "contains"
+    AUTH_USERS ||--o{ CARDS : "owns"
 ```
 
 ---
 
-## 현재 구현 (localStorage) 스키마
-
-MVP에서는 Board·Column 개념 없이 카드 배열만 저장한다.
-
-```
-localStorage key : "kanban-cards"
-value            : JSON 배열 (Card[])
-```
-
-### Card 객체 (현재)
-
-| 필드 | 타입 | 제약 | 설명 |
-|---|---|---|---|
-| `id` | string | PK, 필수 | `Date.now().toString(36) + random` |
-| `text` | string | 필수, trim 후 비어있으면 저장 안 함 | 카드 본문 |
-| `column` | enum | 필수 | `'todo'`, `'inprogress'`, `'done'` 중 하나 |
-
-### 예시 JSON
-
-```json
-[
-  { "id": "lxq8f3ab2", "text": "디자인 시안 검토", "column": "todo" },
-  { "id": "lxq8f3kc1", "text": "백엔드 API 연동",  "column": "inprogress" },
-  { "id": "lxq8f3zy9", "text": "유닛 테스트 작성", "column": "done" }
-]
-```
-
----
-
-## 확장 데이터 모델 (향후 백엔드 전환 시)
-
-### 논리 → 물리 매핑 (SQLite 예시)
+## Supabase SQL DDL
 
 ```sql
-CREATE TABLE boards (
-    id         TEXT PRIMARY KEY,
-    title      TEXT NOT NULL DEFAULT '내 보드',
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+-- auth.users는 Supabase Auth가 자동 생성·관리 (직접 CREATE 불필요)
+
+CREATE TABLE public.cards (
+  id         TEXT PRIMARY KEY,
+  user_id    UUID NOT NULL
+             REFERENCES auth.users(id)
+             ON DELETE CASCADE,
+  text       TEXT NOT NULL
+             CHECK(length(text) BETWEEN 1 AND 2000),
+  "column"   TEXT NOT NULL
+             CHECK("column" IN ('todo', 'inprogress', 'done')),
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE columns (
-    id       TEXT PRIMARY KEY,
-    board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-    name     TEXT NOT NULL,
-    position INTEGER NOT NULL DEFAULT 0
-);
+-- RLS 활성화
+ALTER TABLE public.cards ENABLE ROW LEVEL SECURITY;
 
-CREATE TABLE cards (
-    id         TEXT PRIMARY KEY,
-    column_id  TEXT NOT NULL REFERENCES columns(id) ON DELETE CASCADE,
-    text       TEXT NOT NULL CHECK(length(text) BETWEEN 1 AND 2000),
-    position   INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- 본인 카드만 조회·생성·수정·삭제 가능
+CREATE POLICY "own cards" ON public.cards
+  USING  (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 ```
+
+> Supabase Dashboard → SQL Editor에서 위 DDL을 실행한다.
+
+---
+
+## CRUD API (Supabase JS SDK)
+
+### 조회 (loadCards)
+
+```js
+const { data, error } = await supabaseClient
+  .from('cards')
+  .select('id, text, column')
+  .order('created_at');
+```
+
+### 추가 (addCard)
+
+```js
+const { error } = await supabaseClient
+  .from('cards')
+  .insert({ id: uid(), text, column, user_id: user.id });
+```
+
+### 컬럼 이동 (moveCard)
+
+```js
+const { error } = await supabaseClient
+  .from('cards')
+  .update({ column: targetColumn })
+  .eq('id', id);
+```
+
+### 삭제 (deleteCard)
+
+```js
+const { error } = await supabaseClient
+  .from('cards')
+  .delete()
+  .eq('id', id);
+```
+
+> RLS가 활성화되어 있으므로 `user_id` 조건 없이도 타 사용자 데이터에 접근 불가.
 
 ---
 
@@ -102,9 +106,29 @@ CREATE TABLE cards (
 flowchart LR
     subgraph Browser
         A[app.js\nlet cards]
-        B[(localStorage\nkanban-cards)]
+        B[auth.js\nSupabase session]
     end
 
-    A -- JSON.stringify --> B
-    B -- JSON.parse --> A
+    subgraph Supabase
+        C[(auth.users)]
+        D[(public.cards)]
+    end
+
+    B -- OAuth 인증 --> C
+    A -- SELECT / INSERT\nUPDATE / DELETE --> D
+    D -- RLS: auth.uid = user_id --> D
 ```
+
+---
+
+## v1.0 → v2.0 마이그레이션
+
+| 항목 | v1.0 | v2.0 |
+|---|---|---|
+| 저장소 | `localStorage('kanban-cards')` | Supabase `public.cards` |
+| 인증 | 없음 | Supabase Auth (Google/GitHub) |
+| 데이터 격리 | 없음 (단일 기기) | RLS (`user_id`) |
+| 기기 동기화 | 불가 | 가능 |
+
+> v1.0 localStorage 데이터는 자동 마이그레이션 되지 않는다.  
+> 신규 로그인 후 카드를 다시 입력하거나, 향후 마이그레이션 스크립트를 별도 작성한다.

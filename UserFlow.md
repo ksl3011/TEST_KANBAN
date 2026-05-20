@@ -1,14 +1,42 @@
 # UserFlow — 사용자 흐름도
 
-## 전체 흐름
+## 인증 흐름 (v2.0 신규)
 
 ```mermaid
 flowchart TD
-    A([브라우저에서 index.html 열기]) --> B{localStorage에\n저장 데이터 있음?}
-    B -- 있음 --> C[저장된 카드 배열 로드]
-    B -- 없음 --> D[샘플 카드 3개 생성\n각 컬럼에 1개씩]
-    C --> E[보드 렌더링\nTo-Do · In-Progress · Done]
-    D --> E
+    A([브라우저에서 index.html 열기]) --> B[onAuthStateChange 구독\nSupabase 세션 확인]
+    B --> C{유효한 세션?}
+
+    C -- 있음 --> D[보드 화면 표시\nSupabase에서 카드 로드]
+    C -- 없음 --> E[로그인 화면 표시]
+
+    E --> F{소셜 로그인 선택}
+    F -- Google 버튼 --> G[signInWithOAuth provider=google]
+    F -- GitHub 버튼 --> H[signInWithOAuth provider=github]
+
+    G --> I[Google 로그인 페이지 리다이렉트]
+    H --> J[GitHub 로그인 페이지 리다이렉트]
+
+    I --> K[인증 완료 → Supabase callback\n→ index.html 복귀]
+    J --> K
+
+    K --> L[onAuthStateChange SIGNED_IN 이벤트]
+    L --> D
+
+    D --> M[헤더: 사용자 이메일 + 로그아웃 버튼]
+    M --> N{로그아웃 버튼 클릭?}
+    N -- 예 --> O[signOut → location.reload]
+    O --> E
+```
+
+---
+
+## 보드 전체 흐름 (v2.0)
+
+```mermaid
+flowchart TD
+    A([인증 완료 후 보드 표시]) --> B[Supabase에서 카드 목록 로드]
+    B --> E[보드 렌더링\nTo-Do · In-Progress · Done]
 
     E --> F{사용자 액션}
 

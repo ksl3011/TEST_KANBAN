@@ -7,39 +7,64 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="app-header">
-    <h1>칸반 보드</h1>
-  </header>
 
-  <main class="board">
-    <section class="column" id="col-todo">
-      <div class="column-header" style="--accent: var(--col-todo)">
-        <span class="column-title">To-Do</span>
-        <span class="column-count" data-column="todo"></span>
+  <!-- 로그인 화면 (기본 표시) -->
+  <div id="login-screen">
+    <div class="login-card">
+      <h1 class="login-title">칸반 보드</h1>
+      <p class="login-subtitle">계속하려면 로그인하세요</p>
+      <button class="login-btn login-btn--google" id="btn-google">
+        Google로 계속하기
+      </button>
+      <button class="login-btn login-btn--github" id="btn-github">
+        GitHub로 계속하기
+      </button>
+    </div>
+  </div>
+
+  <!-- 앱 (인증 후 표시) -->
+  <div id="app" hidden>
+    <header class="app-header">
+      <h1>칸반 보드</h1>
+      <div class="user-info">
+        <span id="user-email"></span>
+        <button class="logout-btn" id="btn-logout">로그아웃</button>
       </div>
-      <div class="cards" data-column="todo"></div>
-      <button class="add-btn" data-column="todo">+ 카드 추가</button>
-    </section>
+    </header>
 
-    <section class="column" id="col-inprogress">
-      <div class="column-header" style="--accent: var(--col-progress)">
-        <span class="column-title">In-Progress</span>
-        <span class="column-count" data-column="inprogress"></span>
-      </div>
-      <div class="cards" data-column="inprogress"></div>
-      <button class="add-btn" data-column="inprogress">+ 카드 추가</button>
-    </section>
+    <main class="board">
+      <section class="column" id="col-todo">
+        <div class="column-header" style="--accent: var(--col-todo)">
+          <span class="column-title">To-Do</span>
+          <span class="column-count" data-column="todo"></span>
+        </div>
+        <div class="cards" data-column="todo"></div>
+        <button class="add-btn" data-column="todo">+ 카드 추가</button>
+      </section>
 
-    <section class="column" id="col-done">
-      <div class="column-header" style="--accent: var(--col-done)">
-        <span class="column-title">Done</span>
-        <span class="column-count" data-column="done"></span>
-      </div>
-      <div class="cards" data-column="done"></div>
-      <button class="add-btn" data-column="done">+ 카드 추가</button>
-    </section>
-  </main>
+      <section class="column" id="col-inprogress">
+        <div class="column-header" style="--accent: var(--col-progress)">
+          <span class="column-title">In-Progress</span>
+          <span class="column-count" data-column="inprogress"></span>
+        </div>
+        <div class="cards" data-column="inprogress"></div>
+        <button class="add-btn" data-column="inprogress">+ 카드 추가</button>
+      </section>
 
+      <section class="column" id="col-done">
+        <div class="column-header" style="--accent: var(--col-done)">
+          <span class="column-title">Done</span>
+          <span class="column-count" data-column="done"></span>
+        </div>
+        <div class="cards" data-column="done"></div>
+        <button class="add-btn" data-column="done">+ 카드 추가</button>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

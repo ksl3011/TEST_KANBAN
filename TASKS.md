@@ -74,4 +74,35 @@
 - [ ] 다중 보드 지원
 - [ ] 모바일 터치 드래그 지원
 - [ ] 키보드 전용 카드 이동 (접근성)
-- [ ] 서버 동기화 / 실시간 협업
+- [ ] 실시간 협업 (Supabase Realtime)
+
+## Phase 8: OAuth + Supabase 연동 (v2.0)
+
+### 설계·문서화
+- [x] 아키텍처 결정 (Supabase Auth + DB)
+- [x] `PRD.md` v2.0 갱신 (F-06~F-09 인증 기능 추가)
+- [x] `TRD.md` v2.0 갱신 (Supabase 스택, config.js·auth.js 명세)
+- [x] `DatabaseDesign.md` 갱신 (ERD auth.users 추가, SQL DDL)
+- [x] `UserFlow.md` 갱신 (OAuth 인증 흐름 다이어그램 추가)
+- [x] `TASKS.md` Phase 8 추가
+- [x] `CLAUDE.md` 갱신 (Supabase 아키텍처 반영)
+- [x] `OAUTH.md` 신규 생성 (설정 단계별 가이드)
+
+### 구현
+- [x] `config.js` 생성 (Supabase 클라이언트 초기화 템플릿)
+- [ ] `OAUTH.md` 가이드에 따라 실제 Supabase URL·anon key 입력
+- [ ] `OAUTH.md` 가이드에 따라 Google·GitHub OAuth 앱 등록
+- [ ] Supabase Dashboard에서 `cards` 테이블 생성·RLS 정책 설정
+- [x] `auth.js` — Auth 서비스 IIFE 구현 (signInWithGoogle/GitHub, signOut, onAuthStateChange)
+- [x] `index.html` — Supabase CDN, 로그인 화면 UI, 헤더 사용자정보·로그아웃 버튼 추가
+- [x] `style.css` — 로그인 화면·로그아웃 버튼·헤더 user-info 스타일 추가
+- [x] `app.js` — auth 게이트(boardInitialized 플래그), Supabase CRUD (async), localStorage 완전 제거
+
+### 검증 (예정)
+- [ ] 페이지 로드 시 로그인 화면 표시 확인
+- [ ] Google OAuth 로그인 → 보드 표시 확인
+- [ ] GitHub OAuth 로그인 → 보드 표시 확인
+- [ ] 로그아웃 → 로그인 화면 복귀 확인
+- [ ] 카드 CRUD가 Supabase에 저장됨 (새로고침 후 유지)
+- [ ] 다른 브라우저/기기에서 같은 계정 로그인 시 카드 동기화
+- [ ] 미인증 상태에서 보드 직접 접근 차단 확인

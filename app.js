@@ -1,63 +1,70 @@
-const STORAGE_KEY = 'kanban-cards';
-
-let cards = loadFromStorage();
+let cards = [];
 let dragId = null;
+let boardInitialized = false;
 
-function loadFromStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (_) {}
-  return [
-    { id: uid(), text: '디자인 시안 검토', column: 'todo' },
-    { id: uid(), text: '백엔드 API 연동', column: 'inprogress' },
-    { id: uid(), text: '유닛 테스트 작성', column: 'done' },
-  ];
-}
-
-function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
-}
+// ── 유틸 ─────────────────────────────────────────────
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-function addCard(column, text) {
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Supabase CRUD ────────────────────────────────────
+
+async function loadCards() {
+  const { data, error } = await supabaseClient
+    .from('cards')
+    .select('id, text, column')
+    .order('created_at');
+  if (error) { alert('카드 로드 실패: ' + error.message); return []; }
+  return data;
+}
+
+async function addCard(column, text) {
   const trimmed = text.trim();
   if (!trimmed) return;
-  cards.push({ id: uid(), text: trimmed, column });
-  save();
+  const card = { id: uid(), text: trimmed, column };
+  const { error } = await supabaseClient.from('cards').insert(card);
+  if (error) { alert('카드 추가 실패: ' + error.message); return; }
+  cards.push(card);
   renderAll();
 }
 
-function deleteCard(id) {
+async function deleteCard(id) {
+  const { error } = await supabaseClient.from('cards').delete().eq('id', id);
+  if (error) { alert('카드 삭제 실패: ' + error.message); return; }
   cards = cards.filter(c => c.id !== id);
-  save();
   renderAll();
 }
 
-function moveCard(id, targetColumn) {
+async function moveCard(id, targetColumn) {
   const card = cards.find(c => c.id === id);
-  if (card && card.column !== targetColumn) {
-    card.column = targetColumn;
-    save();
-    renderAll();
-  }
+  if (!card || card.column === targetColumn) return;
+  const { error } = await supabaseClient
+    .from('cards')
+    .update({ column: targetColumn })
+    .eq('id', id);
+  if (error) { alert('카드 이동 실패: ' + error.message); return; }
+  card.column = targetColumn;
+  renderAll();
 }
 
 // ── 렌더링 ──────────────────────────────────────────
 
 function renderAll() {
-  const columns = ['todo', 'inprogress', 'done'];
-  columns.forEach(col => {
-    const zone = document.querySelector(`.cards[data-column="${col}"]`);
+  ['todo', 'inprogress', 'done'].forEach(col => {
+    const zone    = document.querySelector(`.cards[data-column="${col}"]`);
     const counter = document.querySelector(`.column-count[data-column="${col}"]`);
     const colCards = cards.filter(c => c.column === col);
-
     zone.innerHTML = '';
     colCards.forEach(c => zone.appendChild(buildCard(c)));
-
     counter.textContent = colCards.length;
   });
 }
@@ -93,14 +100,6 @@ function buildCard(card) {
   return el;
 }
 
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 // ── 드롭존 이벤트 ────────────────────────────────────
 
 function initDropZones() {
@@ -112,6 +111,7 @@ function initDropZones() {
     });
 
     zone.addEventListener('dragleave', e => {
+      // dragleave는 자식 요소 진입 시에도 발화하므로 relatedTarget 확인
       if (!zone.contains(e.relatedTarget)) {
         zone.classList.remove('drag-over');
       }
@@ -130,10 +130,7 @@ function initDropZones() {
 
 function initAddButtons() {
   document.querySelectorAll('.add-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const column = btn.dataset.column;
-      showForm(column, btn);
-    });
+    btn.addEventListener('click', () => showForm(btn.dataset.column, btn));
   });
 }
 
@@ -158,17 +155,12 @@ function showForm(column, addBtn) {
   textarea.focus();
 
   const confirm = () => {
-    if (!textarea.value.trim()) {
-      textarea.focus();
-      return;
-    }
+    if (!textarea.value.trim()) { textarea.focus(); return; }
     addCard(column, textarea.value);
     cleanup();
   };
 
-  const cancel = () => {
-    cleanup();
-  };
+  const cancel = () => { cleanup(); };
 
   function cleanup() {
     form.remove();
@@ -179,17 +171,44 @@ function showForm(column, addBtn) {
   form.querySelector('.btn-cancel').addEventListener('click', cancel);
 
   textarea.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      confirm();
-    } else if (e.key === 'Escape') {
-      cancel();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirm(); }
+    else if (e.key === 'Escape') cancel();
+  });
+}
+
+// ── 인증·화면 전환 ─────────────────────────────────────
+
+function showLoginScreen() {
+  document.getElementById('login-screen').hidden = false;
+  document.getElementById('app').hidden = true;
+}
+
+async function initBoard(user) {
+  document.getElementById('login-screen').hidden = true;
+  document.getElementById('app').hidden = false;
+  document.getElementById('user-email').textContent = user.email;
+
+  cards = await loadCards();
+  renderAll();
+  initDropZones();
+  initAddButtons();
+
+  document.getElementById('btn-logout').addEventListener('click', () => {
+    AuthKanban.signOut();
   });
 }
 
 // ── 초기화 ────────────────────────────────────────────
 
-renderAll();
-initDropZones();
-initAddButtons();
+document.getElementById('btn-google').addEventListener('click', () => AuthKanban.signInWithGoogle());
+document.getElementById('btn-github').addEventListener('click', () => AuthKanban.signInWithGitHub());
+
+AuthKanban.onAuthStateChange((event, session) => {
+  if (session && !boardInitialized) {
+    boardInitialized = true;
+    initBoard(session.user);
+  } else if (!session) {
+    boardInitialized = false;
+    showLoginScreen();
+  }
+});
